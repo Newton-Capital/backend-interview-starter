@@ -1,0 +1,18 @@
+{
+  "wallets": [
+    { "walletId": "w_alice_gbp",   "userId": "u_alice",      "currency": "GBP", "balance": "500.00" },
+    { "walletId": "w_bob_gbp",     "userId": "u_bob",        "currency": "GBP", "balance": "3.30" },
+    { "walletId": "w_carol_gbp",   "userId": "u_carol",      "currency": "GBP", "balance": "101.50" },
+    { "walletId": "w_dan_usd",     "userId": "u_dan",        "currency": "USD", "balance": "0.00" },
+    { "walletId": "w_slow_gbp",    "userId": "u_slow",       "currency": "GBP", "balance": "500.00" },
+    { "walletId": "w_500_gbp",     "userId": "u_500",        "currency": "GBP", "balance": "500.00" },
+    { "walletId": "w_down_gbp",    "userId": "u_down",       "currency": "GBP", "balance": "500.00" },
+    { "walletId": "w_short_gbp",   "userId": "u_shortquote", "currency": "GBP", "balance": "500.00" },
+    { "walletId": "w_nolimit_gbp", "userId": "u_nolimit",    "currency": "GBP", "balance": "500.00" }
+  ],
+  "quotes": [
+    { "quoteId": "q_expired", "userId": "u_alice", "walletId": "w_alice_gbp",
+      "fundingSource": "WALLET", "amount": "10.00", "fee": "1.00", "total": "11.00",
+      "expiresAt": "2026-01-01T00:00:00Z" }
+  ]
+}

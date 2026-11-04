@@ -1,0 +1,42 @@
+// Java scaffold. Wiring only: nothing in here knows what a payout is.
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.4'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.lemfi'
+version = '0.1.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') { useJUnitPlatform() }
+
+// `./gradlew migrate`: apply src/main/resources/db/migration with Flyway, without starting the app.
+tasks.register('migrate', JavaExec) {
+    group = 'application'
+    description = 'Apply Flyway migrations to DATABASE_URL'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.lemfi.send.MigrateMain'
+}
+
+// `./gradlew seed`: parse seed/*.json and call SeedInserter, which the candidate finishes.
+tasks.register('seed', JavaExec) {
+    group = 'application'
+    description = 'Load seed/*.json into your tables'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.lemfi.send.seed.SeedMain'
+}

@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: LemFi Credit SNPL
+  version: 1.0.0
+  description: |
+    The partner your service integrates with for credit-funded sends. Credit is
+    a two-step integration: a draw reserves credit, a release gives it back.
+
+    Pricing: fee is 2% of the amount, interest is 1% of the amount per tenor
+    month, both rounded half up to two places. totalRepayment = amount + fee +
+    interest. A quote expires 5 minutes after it is issued (the response says
+    exactly when). Each customer has a credit limit reduced by their RESERVED
+    draws; a quote above the available limit is declined.
+
+    Like any partner, this one can be slow, return 5xx, or drop a connection
+    after it has committed a change. Design for that.
+
+servers:
+  - url: http://localhost:9000
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 64 }
+  schemas:
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^[0-9]+\.[0-9]{2}$', example: "100.00", description: Decimal string with exactly two places. Anything else is a 400. }
+        currency: { type: string, example: GBP }
+    CreditQuoteRequest:
+      type: object
+      required: [customerId, amount, tenorMonths]
+      properties:
+        customerId: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        tenorMonths: { type: integer, enum: [1, 3, 6] }
+    CreditQuote:
+      type: object
+      required: [creditQuoteId, fee, interest, totalRepayment, availableLimit, expiresAt]
+      properties:
+        creditQuoteId: { type: string, example: cq_3f9a1c2b7d4e }
+        fee: { $ref: '#/components/schemas/Money' }
+        interest: { $ref: '#/components/schemas/Money' }
+        totalRepayment: { $ref: '#/components/schemas/Money' }
+        availableLimit: { $ref: '#/components/schemas/Money' }
+        expiresAt: { type: string, format: date-time }
+    DrawRequest:
+      type: object
+      required: [customerId, creditQuoteId, amount]
+      properties:
+        customerId: { type: string }
+        creditQuoteId: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+    Draw:
+      type: object
+      required: [drawId, status, fee, interest, totalRepayment]
+      properties:
+        drawId: { type: string, example: cd_9b2e4d7a1c3f }
+        status: { type: string, enum: [RESERVED, RELEASED, SETTLED] }
+        creditQuoteId: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        fee: { $ref: '#/components/schemas/Money' }
+        interest: { $ref: '#/components/schemas/Money' }
+        totalRepayment: { $ref: '#/components/schemas/Money' }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, NOT_FOUND, QUOTE_EXPIRED, QUOTE_ALREADY_DRAWN, IDEMPOTENCY_CONFLICT, DECLINED, ALREADY_SETTLED, INTERNAL_ERROR, UNAVAILABLE]
+        message: { type: string }
+  responses:
+    Error:
+      description: Error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      responses:
+        '200': { description: OK }
+
+  /credit/quotes:
+    post:
+      summary: Price a credit-funded send
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreditQuoteRequest' } } }
+      responses:
+        '200': { description: Priced, content: { application/json: { schema: { $ref: '#/components/schemas/CreditQuote' } } } }
+        '400': { description: VALIDATION_ERROR. malformed body, amount not two places, tenorMonths not 1, 3 or 6 }
+        '422': { description: DECLINED. amount exceeds the available limit, or customer not eligible }
+        '500': { description: INTERNAL_ERROR }
+        '503': { description: UNAVAILABLE }
+
+  /credit/draws:
+    post:
+      summary: Reserve credit against a quote. Idempotent on Idempotency-Key.
+      description: >
+        The same key with the same body returns 200 and the original draw. The
+        same key with a different body is a 409. A quote can be drawn once; a
+        second draw with a new key is a 409.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DrawRequest' } } }
+      responses:
+        '201': { description: Reserved, content: { application/json: { schema: { $ref: '#/components/schemas/Draw' } } } }
+        '200': { description: Replay of an earlier draw with the same key and body, content: { application/json: { schema: { $ref: '#/components/schemas/Draw' } } } }
+        '400': { description: VALIDATION_ERROR. missing Idempotency-Key, malformed body }
+        '404': { description: NOT_FOUND. unknown quote, or a quote that belongs to another customer }
+        '409': { description: QUOTE_ALREADY_DRAWN, or IDEMPOTENCY_CONFLICT when the key was used with a different body }
+        '410': { description: QUOTE_EXPIRED }
+        '422': { description: DECLINED at draw time }
+        '500': { description: INTERNAL_ERROR }
+        '503': { description: UNAVAILABLE }
+
+  /credit/draws/{drawId}:
+    get:
+      summary: Read a draw. Use this to resolve an unknown outcome.
+      parameters: [{ name: drawId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Draw' } } } }
+        '404': { description: NOT_FOUND }
+
+  /credit/draws/{drawId}/release:
+    post:
+      summary: Release a reservation. Idempotent. a second release is a 200 no-op.
+      parameters: [{ name: drawId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Released, or already released, content: { application/json: { schema: { $ref: '#/components/schemas/Draw' } } } }
+        '404': { description: NOT_FOUND }
+        '409': { description: ALREADY_SETTLED. the draw is settled and cannot be released }
+        '500': { description: INTERNAL_ERROR }
+

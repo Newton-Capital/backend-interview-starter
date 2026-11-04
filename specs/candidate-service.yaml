@@ -1,0 +1,176 @@
+openapi: 3.0.3
+info:
+  title: LemFi Send Service (candidate)
+  version: 1.0.0
+  description: >
+    The service you build. A customer asks for a quote, then initiates a payout
+    against that quote, funded from their wallet or from a credit line (Credit
+    SNPL). A payout completes once the wallet is debited or the credit is drawn.
+    The integration harness treats the service as a black box over HTTP, so the
+    contract is fixed and the implementation language is free.
+
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema: { type: string }
+      description: Authenticated customer id, set by the gateway. Trusted.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 64 }
+  schemas:
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^[0-9]+\.[0-9]{2}$', example: "100.50", description: Decimal string, two places }
+        currency: { type: string, example: GBP }
+    FundingSource:
+      type: string
+      enum: [WALLET, CREDIT]
+    Wallet:
+      type: object
+      required: [walletId, currency, balance]
+      properties:
+        walletId: { type: string }
+        currency: { type: string }
+        balance: { $ref: '#/components/schemas/Money' }
+    QuoteRequest:
+      type: object
+      required: [walletId, fundingSource, amount, recipientId]
+      properties:
+        walletId: { type: string }
+        fundingSource: { $ref: '#/components/schemas/FundingSource' }
+        amount: { $ref: '#/components/schemas/Money' }
+        recipientId: { type: string, description: Opaque identifier of the recipient }
+        # credit:start
+        tenorMonths:
+          type: integer
+          enum: [1, 3, 6]
+          description: Required when fundingSource is CREDIT
+        # credit:end
+    Quote:
+      type: object
+      required: [quoteId, fundingSource, amount, fee, total, expiresAt]
+      properties:
+        quoteId: { type: string }
+        fundingSource: { $ref: '#/components/schemas/FundingSource' }
+        amount: { $ref: '#/components/schemas/Money' }
+        fee: { $ref: '#/components/schemas/Money' }
+        # credit:start
+        interest:
+          allOf: [{ $ref: '#/components/schemas/Money' }]
+          description: Present only for CREDIT
+        # credit:end
+        total:
+          allOf: [{ $ref: '#/components/schemas/Money' }]
+          description: WALLET = amount + fee. CREDIT = amount + fee + interest (total repayment)
+        # credit:start
+        creditQuoteRef: { type: string, description: SNPL quote id, CREDIT only }
+        # credit:end
+        expiresAt: { type: string, format: date-time }
+    PayoutRequest:
+      type: object
+      required: [quoteId]
+      properties:
+        quoteId: { type: string }
+    PayoutStatus:
+      type: string
+      enum: [PENDING, SUBMITTED, COMPLETED, FAILED, UNKNOWN]
+      description: >
+        PENDING: accepted, funds not yet secured. SUBMITTED: funds secured,
+        completion pending. COMPLETED / FAILED: terminal. UNKNOWN: the credit
+        outcome could not be established; needs reconciliation.
+    Payout:
+      type: object
+      required: [payoutId, quoteId, status, fundingSource, amount, createdAt]
+      properties:
+        payoutId: { type: string }
+        quoteId: { type: string }
+        status: { $ref: '#/components/schemas/PayoutStatus' }
+        fundingSource: { $ref: '#/components/schemas/FundingSource' }
+        amount: { $ref: '#/components/schemas/Money' }
+        # credit:start
+        creditDrawRef: { type: string, description: SNPL draw id, CREDIT only }
+        # credit:end
+        failureReason: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [VALIDATION_ERROR, NOT_FOUND, FORBIDDEN, QUOTE_EXPIRED,
+                 INSUFFICIENT_FUNDS, CREDIT_DECLINED, IDEMPOTENCY_CONFLICT,
+                 DEPENDENCY_UNAVAILABLE]
+        message: { type: string }
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      responses:
+        '200': { description: OK }
+
+  /wallets/{walletId}:
+    get:
+      summary: Read a wallet and its balance
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { name: walletId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Wallet' } } } }
+        '403': { description: FORBIDDEN, wallet belongs to another user }
+        '404': { description: NOT_FOUND, wallet unknown }
+
+  /quotes:
+    post:
+      summary: Create a quote for a send
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/QuoteRequest' } } }
+      responses:
+        '201': { description: Quote created, content: { application/json: { schema: { $ref: '#/components/schemas/Quote' } } } }
+        '400': { description: VALIDATION_ERROR }
+        '403': { description: FORBIDDEN, wallet belongs to another user }
+        '404': { description: NOT_FOUND, wallet unknown }
+        # credit:start
+        '422': { description: CREDIT_DECLINED, credit not available for this amount }
+        '503': { description: DEPENDENCY_UNAVAILABLE, credit service unreachable }
+        # credit:end
+
+  /payouts:
+    post:
+      summary: Initiate a payout against a quote
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PayoutRequest' } } }
+      responses:
+        '201': { description: Payout created, content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '200': { description: Same Idempotency-Key and same body seen before; returns the original payout }
+        '403': { description: FORBIDDEN, quote belongs to another user }
+        '404': { description: NOT_FOUND, quote unknown }
+        '409': { description: IDEMPOTENCY_CONFLICT, same key with a different body }
+        '410': { description: QUOTE_EXPIRED }
+        '422': { description: INSUFFICIENT_FUNDS or CREDIT_DECLINED }
+
+  /payouts/{payoutId}:
+    get:
+      summary: Read a payout
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+        - { name: payoutId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '403': { description: FORBIDDEN }
+        '404': { description: NOT_FOUND }
