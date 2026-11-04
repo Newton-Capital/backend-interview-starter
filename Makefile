@@ -9,7 +9,7 @@ SHELL := /bin/bash
 # Docker Compose reads the same file, so a POSTGRES_PORT set there moves the
 # host port for `make up` and for `make reference` alike.
 -include .env
-VERSION ?= 0.1.0-rc2
+VERSION ?= 0.1.0-rc3
 LEVEL ?= senior
 POSTGRES_PORT ?= 5432
 # The scaffold the candidate chose: go, java, typescript or python. Set it in .env.

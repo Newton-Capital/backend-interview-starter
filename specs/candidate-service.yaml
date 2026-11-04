@@ -47,12 +47,10 @@ components:
         fundingSource: { $ref: '#/components/schemas/FundingSource' }
         amount: { $ref: '#/components/schemas/Money' }
         recipientId: { type: string, description: Opaque identifier of the recipient }
-        # credit:start
         tenorMonths:
           type: integer
           enum: [1, 3, 6]
           description: Required when fundingSource is CREDIT
-        # credit:end
     Quote:
       type: object
       required: [quoteId, fundingSource, amount, fee, total, expiresAt]
@@ -61,17 +59,13 @@ components:
         fundingSource: { $ref: '#/components/schemas/FundingSource' }
         amount: { $ref: '#/components/schemas/Money' }
         fee: { $ref: '#/components/schemas/Money' }
-        # credit:start
         interest:
           allOf: [{ $ref: '#/components/schemas/Money' }]
           description: Present only for CREDIT
-        # credit:end
         total:
           allOf: [{ $ref: '#/components/schemas/Money' }]
           description: WALLET = amount + fee. CREDIT = amount + fee + interest (total repayment)
-        # credit:start
         creditQuoteRef: { type: string, description: SNPL quote id, CREDIT only }
-        # credit:end
         expiresAt: { type: string, format: date-time }
     PayoutRequest:
       type: object
@@ -94,9 +88,7 @@ components:
         status: { $ref: '#/components/schemas/PayoutStatus' }
         fundingSource: { $ref: '#/components/schemas/FundingSource' }
         amount: { $ref: '#/components/schemas/Money' }
-        # credit:start
         creditDrawRef: { type: string, description: SNPL draw id, CREDIT only }
-        # credit:end
         failureReason: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -141,10 +133,8 @@ paths:
         '400': { description: VALIDATION_ERROR }
         '403': { description: FORBIDDEN, wallet belongs to another user }
         '404': { description: NOT_FOUND, wallet unknown }
-        # credit:start
         '422': { description: CREDIT_DECLINED, credit not available for this amount }
         '503': { description: DEPENDENCY_UNAVAILABLE, credit service unreachable }
-        # credit:end
 
   /payouts:
     post:

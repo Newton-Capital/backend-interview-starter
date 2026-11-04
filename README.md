@@ -1,6 +1,6 @@
 # Send service: interview starter
 
-This repository is the starting point for a 75-minute live session with
+This repository is the starting point for a 60-minute live session with
 LemFi. You build a small money-movement service against a fixed HTTP
 contract, in the language you choose from the four scaffolds here, on your
 own machine, with your own editor and tools. Nothing is submitted in
@@ -15,59 +15,38 @@ A customer asks for a **quote** for sending money, then **initiates a
 payout** against that quote. The quote fixes the price; the payout moves
 the funds.
 
-<!-- credit:start -->
 A send is funded in one of two ways:
 
 - **WALLET**: the customer's wallet is debited by the quote total.
 - **CREDIT**: a credit line from a partner, Credit SNPL, is drawn for the
   amount. The wallet is not touched. The partner's API is described in
-  `specs/credit-snpl.yaml` and runs locally as a container; you write the
-  client.
+  [`specs/credit-snpl.yaml`](specs/credit-snpl.yaml) and runs locally as a
+  container; you write the client.
 
 A payout is complete once the wallet is debited or the credit is drawn.
 There is no downstream delivery to build.
-<!-- credit:end -->
 
-### Rules
+The contract your service implements is
+[`specs/candidate-service.yaml`](specs/candidate-service.yaml). The harness
+that checks your service during the session treats it as a black box over
+HTTP, so the contract is exact. Everything behind it is yours to design:
+storage, data model, how you talk to the partner, how you handle failures.
 
-- **Money** is a decimal string with exactly two places (`"100.50"`), with
-  a currency. Treat anything else as a validation error. Amounts are never
-  floating point.
-- **Wallet fee**: 1.5% of the amount, rounded half up to two places, with a
-  minimum per currency (`seed/fees.json`). The quote total is amount plus
+### Business rules
+
+- All amounts in the API are decimal strings with the currency's usual
+  precision, for example `"100.50"` for GBP. How you represent, store and
+  calculate money inside your service is your decision.
+- A quote is valid for 5 minutes. A payout must reference an unexpired
+  quote.
+- A wallet quote charges a fee of 1.5% of the amount, rounded half up, with
+  a minimum per currency in `seed/fees.json`. The quote total is amount plus
   fee.
-- **A quote expires** 5 minutes after it is issued. A payout against an
-  expired quote is `410 QUOTE_EXPIRED` and moves nothing.
-- **Insufficient funds** is `422 INSUFFICIENT_FUNDS`, and a wallet never
-  goes below zero, whatever arrives at the same time.
-- **Ownership**: a wallet, quote or payout that belongs to another customer
-  is `403 FORBIDDEN` for the caller, not `404`. The caller is the
-  `X-User-Id` header; the gateway has already authenticated it.
-- **Idempotency**: every `POST /payouts` carries an `Idempotency-Key`. The
-  same key with the same body returns the original payout with `200`,
-  however many times and however concurrently it arrives. The same key with
-  a different body is `409 IDEMPOTENCY_CONFLICT`.
-<!-- credit:start -->
-- **Credit pricing** comes from the partner: pass its fee and interest
-  through, do not recompute them. The quote total is the partner's total
-  repayment. A credit quote expires when the partner's does if that is
-  sooner than your 5 minutes.
-- **The partner can misbehave.** A quote must still answer within 3 seconds
-  when the partner is slow or down, with `503 DEPENDENCY_UNAVAILABLE`, and
-  wallet quotes must be unaffected. A decline from the partner is
-  `422 CREDIT_DECLINED`, not an outage.
-- **An unknown outcome is not a failure.** If the partner's draw request
-  times out or answers 5xx, the draw may still have happened. The payout is
-  `UNKNOWN` until you have established what the partner did; it is never
-  marked `FAILED` on a guess, and a retry must never reserve credit twice.
-- **The quote is the price.** If the partner's draw comes back with a
-  different fee from the one it quoted, release the draw and fail the
-  payout. The customer is never charged a price they did not see.
-<!-- credit:end -->
-
-The contract is `specs/candidate-service.yaml`. The harness that checks
-your service during the session treats it as a black box over HTTP, so the
-contract is exact and the implementation is yours.
+- A credit quote gets its fee and interest from the Credit SNPL service.
+  Total repayment is amount plus fee plus interest. The quote expires when
+  the SNPL quote expires, if that is sooner than 5 minutes.
+- A wallet and a quote belong to one customer. The customer is identified by
+  the `X-User-Id` header, which you can trust: an upstream gateway sets it.
 
 ## Setup, before the session
 
@@ -98,21 +77,17 @@ The session is a screen share with one interviewer. Roughly:
 1. The interviewer gives you a link; `make harness-load URL=<link>` loads
    the check tool. From then on `make tier1` runs the public checks against
    your running service and writes a report to `out/`; `make report` opens it.
-2. You build the wallet path: quotes, payouts, the seed, idempotency.
-   `make tier1` is run around the 35-minute mark.
-<!-- credit:start -->
+2. You build the wallet path: quotes, payouts, the seed. `make tier1` is run
+   around the 30-minute mark.
 3. You add the credit path against the partner stub.
-<!-- credit:end -->
-4. `make tier1` is run again around 50 minutes, then the interviewer runs
+4. `make tier1` is run again around 40 minutes, then the interviewer runs
    further checks and talks through what they show, including what your
    service does when the partner misbehaves.
 5. The last part is discussion: the decisions you made and the ones you
    would make with more time.
 
-The public checks cover the fee rule and rounding, quote expiry,
-ownership, insufficient funds, the two basic idempotency cases and the
-happy paths. You can read them as the rules above: if the rules hold, they
-pass.
+The public checks follow the business rules and the contract: if both hold,
+they pass.
 
 Use whatever you normally use to write code, including AI tools. We are
 interested in the service you end up with and in how you reason about it.
