@@ -1,0 +1,53 @@
+# Runs the Credit SNPL stub, PostgreSQL and, once loaded at the start of the
+# session, the harness. Your service runs on the host, not in a container,
+# so your debugger and tools work normally. POSTGRES_PORT in .env moves the
+# host port when 5432 is taken.
+services:
+  credit-snpl:
+    image: ghcr.io/newton-capital/interview-credit-stub:0.1.0-rc2
+    ports: ["9000:9000"]
+    environment:
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      DEFAULT_LIMIT: ${DEFAULT_LIMIT:-1000.00}
+    healthcheck:
+      test: ["CMD", "/stub", "-healthcheck"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s
+
+  postgres:
+    image: postgres:16-alpine
+    # POSTGRES_PORT moves the host port when 5432 is taken on the machine.
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    environment:
+      POSTGRES_USER: interview
+      POSTGRES_PASSWORD: interview
+      POSTGRES_DB: send
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interview -d send"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  # The harness is loaded from the session tarball at minute zero and runs
+  # once per command (`docker compose run --rm harness ...`); the `check`
+  # profile keeps `docker compose up` from starting it. The candidate's
+  # service runs on the host, reached through host.docker.internal; the
+  # host-gateway mapping makes that work on Linux as well as macOS and Windows.
+  harness:
+    image: ${HARNESS_IMAGE:-interview-harness:session}
+    profiles: [check]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      CANDIDATE_URL: ${CANDIDATE_URL:-http://host.docker.internal:8080}
+      STUB_URL: http://credit-snpl:9000
+      LEVEL: ${LEVEL:-senior}
+    volumes: ["./out:/out"]
+    depends_on:
+      credit-snpl:
+        condition: service_healthy
+
+volumes:
+  pgdata:

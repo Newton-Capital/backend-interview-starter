@@ -1,0 +1,8 @@
+{
+  "quoteTtlSeconds": 300,
+  "wallet": {
+    "feePercent": "1.5",
+    "minimumFee": { "GBP": "1.00", "USD": "1.00", "NGN": "100.00" },
+    "rounding": "HALF_UP"
+  }
+}
