@@ -1,6 +1,6 @@
 # Send service: interview starter
 
-This repository is the starting point for a 60-minute live session with
+This repository is the starting point for a 75-minute live session with
 LemFi. You build a small money-movement service against a fixed HTTP
 contract, in the language you choose from the four scaffolds here, on your
 own machine, with your own editor and tools. Nothing is submitted in
@@ -41,7 +41,7 @@ storage, data model, how you handle failures.
 ## Setup, before the session
 
 You need Docker (with Compose) and the toolchain for your language: Go
-1.22+, Node 22+, Java 21 with no Gradle install needed, or Python 3.12+.
+1.24+, Node 22+, Java 21 with no Gradle install needed, or Python 3.12+.
 
 ```
 cp .env.example .env        # set SCAFFOLD to go, java, typescript or python
@@ -52,6 +52,19 @@ make smoke                  # builds your scaffold and runs its empty migration
 `make smoke` ending in `<your scaffold>: ok` is the whole pre-session
 check. If port 5432 is taken on your machine, set `POSTGRES_PORT` in
 `.env`; everything reads it.
+
+### If something fails
+
+- `make smoke` stops with `dyld: missing LC_UUID load command` on macOS: your
+  Go is older than the scaffold asks for. Its `go.mod` says Go 1.24, which a
+  Go 1.21 or later install downloads on the first build; if yours does not,
+  install Go 1.24 or later.
+- `make tier1` cannot reach your service although `curl localhost:8080/healthz`
+  answers: the check tool runs in a container and reaches your service on the
+  host as `host.docker.internal`. Rancher Desktop names the host
+  `host.lima.internal` instead; set `CANDIDATE_URL=http://host.lima.internal:8080`
+  in `.env`. Any other Docker setup with its own name for the host takes it
+  through the same variable.
 
 Each scaffold is wiring only: a health endpoint, configuration from the
 environment, a database connection, one empty migration and a seed command
@@ -68,8 +81,8 @@ The session is a screen share with one interviewer. Roughly:
    the check tool. From then on `make tier1` runs the public checks against
    your running service and writes a report to `out/`; `make report` opens it.
 2. You build the wallet path: quotes, payouts, the seed. `make tier1` is run
-   around the 30-minute mark.
-3. `make tier1` is run again around 40 minutes, then the interviewer runs
+   around the 35-minute mark.
+3. `make tier1` is run again around 50 minutes, then the interviewer runs
    further checks and talks through what they show.
 4. The last part is discussion: the decisions you made and the ones you
    would make with more time.
