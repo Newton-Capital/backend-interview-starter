@@ -4,7 +4,7 @@
 # host port when 5432 is taken.
 services:
   credit-snpl:
-    image: ghcr.io/newton-capital/interview-credit-stub:0.1.0-rc4
+    image: public.ecr.aws/p9g9t4b6/backend-interview-kit/interview-credit-stub:0.1.0-rc5
     ports: ["9000:9000"]
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-text}

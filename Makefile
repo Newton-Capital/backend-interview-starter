@@ -9,7 +9,7 @@ SHELL := /bin/bash
 # Docker Compose reads the same file, so a POSTGRES_PORT set there moves the
 # host port for `make up` and for `make reference` alike.
 -include .env
-VERSION ?= 0.1.0-rc4
+VERSION ?= 0.1.0-rc5
 LEVEL ?= senior
 POSTGRES_PORT ?= 5432
 # The scaffold the candidate chose: go, java, typescript or python. Set it in .env.
@@ -17,8 +17,10 @@ SCAFFOLD ?=
 # The scaffolds sit at the root of this repo: go/, java/, typescript/, python/.
 SCAFFOLD_DIR ?= .
 DATABASE_URL ?= postgres://interview:interview@localhost:$(POSTGRES_PORT)/send?sslmode=disable
-STUB_IMAGE ?= ghcr.io/newton-capital/interview-credit-stub:$(VERSION)
-HARNESS_IMAGE ?= ghcr.io/newton-capital/interview-harness:$(VERSION)
+# Both images live in ECR Public; CI pushes them there on a tag.
+REGISTRY ?= public.ecr.aws/p9g9t4b6/backend-interview-kit
+STUB_IMAGE ?= $(REGISTRY)/interview-credit-stub:$(VERSION)
+HARNESS_IMAGE ?= $(REGISTRY)/interview-harness:$(VERSION)
 export STUB_IMAGE HARNESS_IMAGE LEVEL POSTGRES_PORT DATABASE_URL LOG_FORMAT DEFAULT_LIMIT CANDIDATE_URL
 COMPOSE_CHECK = docker compose --profile check
 
