@@ -77,9 +77,11 @@ and must be safe to run again (it resets the data to the files).
 
 The session is a screen share with one interviewer. Roughly:
 
-1. The interviewer gives you a link; `make harness-load URL=<link>` loads
-   the check tool. From then on `make tier1` runs the public checks against
-   your running service and writes a report to `out/`; `make report` opens it.
+1. `make harness-load` pulls the check tool at the version this repository
+   pins; if the interviewer gives you an image or a link instead, pass it as
+   `make harness-load URL=<image or link>`. From then on `make tier1` runs
+   the public checks against your running service and writes a report to
+   `out/`; `make report` opens it.
 2. You build the wallet path: quotes, payouts, the seed. `make tier1` is run
    around the 35-minute mark.
 3. `make tier1` is run again around 50 minutes, then the interviewer runs

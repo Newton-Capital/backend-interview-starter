@@ -9,7 +9,7 @@ SHELL := /bin/bash
 # Docker Compose reads the same file, so a POSTGRES_PORT set there moves the
 # host port for `make up` and for `make reference` alike.
 -include .env
-VERSION ?= 0.1.0-rc6
+VERSION ?= 0.1.0-rc7
 LEVEL ?= senior
 POSTGRES_PORT ?= 5432
 # The scaffold the candidate chose: go, java, typescript or python. Set it in .env.
@@ -62,11 +62,17 @@ reset: down up ## Clean slate: down then up
 stub-logs: ## Tail the stub's request log in a second terminal
 	docker compose logs -f credit-snpl
 
-harness-load: ## Download the session tarball the interviewer pastes (URL=...) and load it as interview-harness:session
-	@test -n "$(URL)" || { echo "usage: make harness-load URL=<link>"; exit 2; }
-	curl -fsSL "$(URL)" -o /tmp/interview-harness.tar
-	docker load -i /tmp/interview-harness.tar
-	@echo "loaded; run make tier1 LEVEL=$(LEVEL)"
+harness-load: ## Get the check tool as interview-harness:session: pulls this version from ECR Public; URL=<image reference or tarball link> takes what the interviewer gives instead
+	@src="$(URL)"; [ -n "$$src" ] || src="$(HARNESS_IMAGE)"; \
+	case "$$src" in \
+	  http://*|https://*) \
+	    echo "downloading $$src"; \
+	    curl -fsSL "$$src" -o /tmp/interview-harness.tar && docker load -i /tmp/interview-harness.tar ;; \
+	  *) \
+	    echo "pulling $$src"; \
+	    docker pull "$$src" && docker tag "$$src" interview-harness:session ;; \
+	esac
+	@echo "loaded interview-harness:session; run make tier1 LEVEL=$(LEVEL)"
 
 tier1: ## Run Tier 1 for LEVEL (senior or mid), one line per scenario, report in out/tier1.html
 	@mkdir -p out
