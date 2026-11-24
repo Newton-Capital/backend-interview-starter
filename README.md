@@ -32,9 +32,8 @@ storage, data model, how you handle failures.
   calculate money inside your service is your decision.
 - A quote is valid for 5 minutes. A payout must reference an unexpired
   quote.
-- A wallet quote charges a fee of 1.5% of the amount, rounded half up, with
-  a minimum per currency in `seed/fees.json`. The quote total is amount plus
-  fee.
+- A wallet quote charges a fee of 1.5% of the amount, with a minimum per
+  currency in `seed/fees.json`. The quote total is amount plus fee.
 - A wallet and a quote belong to one customer. The customer is identified by
   the `X-User-Id` header, which you can trust: an upstream gateway sets it.
 
@@ -88,6 +87,9 @@ The session is a screen share with one interviewer. Roughly:
    further checks and talks through what they show.
 4. The last part is discussion: the decisions you made and the ones you
    would make with more time.
+
+If you use a coding agent, it reads `AGENTS.md`: the check commands above
+are yours to run and the report is yours to read, not its.
 
 The public checks follow the business rules and the contract: if both hold,
 they pass.
