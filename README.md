@@ -39,9 +39,8 @@ storage, data model, how you talk to the partner, how you handle failures.
   calculate money inside your service is your decision.
 - A quote is valid for 5 minutes. A payout must reference an unexpired
   quote.
-- A wallet quote charges a fee of 1.5% of the amount, rounded half up, with
-  a minimum per currency in `seed/fees.json`. The quote total is amount plus
-  fee.
+- A wallet quote charges a fee of 1.5% of the amount, with a minimum per
+  currency in `seed/fees.json`. The quote total is amount plus fee.
 - A credit quote gets its fee and interest from the Credit SNPL service.
   Total repayment is amount plus fee plus interest. The quote expires when
   the SNPL quote expires, if that is sooner than 5 minutes.
@@ -100,6 +99,9 @@ The session is a screen share with one interviewer. Roughly:
    service does when the partner misbehaves.
 5. The last part is discussion: the decisions you made and the ones you
    would make with more time.
+
+If you use a coding agent, it reads `AGENTS.md`: the check commands above
+are yours to run and the report is yours to read, not its.
 
 The public checks follow the business rules and the contract: if both hold,
 they pass.
